@@ -69,18 +69,21 @@ function PortfolioModel() {
   });
 
   var rowLookup = {};
-
+  var charts = {};
+  
   self.loadPositions = function(positions) {
     for ( var i = 0; i < positions.length; i++) {
       var row = new PortfolioRow(positions[i]);
       self.rows.push(row);
       rowLookup[row.ticker] = row;
+      charts[row.ticker] = createChart(row.ticker);
     }
   };
 
   self.processQuote = function(quote) {
     if (rowLookup.hasOwnProperty(quote.ticker)) {
       rowLookup[quote.ticker].updatePrice(quote.price);
+      charts[quote.ticker].series[0].addPoint({y: quote.price, x: ((new Date()).getTime())});
     }
   };
 
@@ -101,12 +104,14 @@ function PortfolioRow(data) {
   self.shares = ko.observable(data.shares);
   self.value = ko.computed(function() { return (self.price() * self.shares()); });
   self.formattedValue = ko.computed(function() { return "$" + self.value().toFixed(2); });
+  self.chart = '<div id="chart-'+self.ticker+'" style="height:100px;"></div>';
 
   self.updatePrice = function(newPrice) {
     var delta = (newPrice - self.price()).toFixed(2);
     self.arrow((delta < 0) ? '<i class="icon-arrow-down"></i>' : '<i class="icon-arrow-up"></i>');
     self.change((delta / self.price() * 100).toFixed(2));
     self.price(newPrice);
+    
   };
 };
 
@@ -163,3 +168,53 @@ function TradeModel(stompClient) {
     $('#trade-dialog').modal('hide');
   }
 }
+
+function createChart(ticker) {
+  
+  return new Highcharts.Chart({
+    chart: {
+      renderTo: 'chart-'+ticker
+    },
+    title: {
+      text: false
+    },
+    xAxis: {
+      type: 'datetime'
+    },
+    yAxis: {
+      title: {
+        text: false
+      }
+    },
+    plotOptions: {
+      series: {
+        plotLines: [{
+            value: 0,
+            width: 1,
+            color: '#808080'
+        }],
+        marker: {
+          enabled: false 
+        }
+      }
+    },
+    tooltip: {
+      formatter: function() {
+        return "<b>$"+Highcharts.numberFormat(this.y, 2)+"</b><br/>"+
+        Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x);
+      }
+    },
+    legend: {
+      enabled: false
+    },
+    exporting: {
+      enabled: false
+    },
+    series: [{
+      color: '#afafaf',
+      name: '$ Price',
+      data: []
+    }]
+  });
+}
+
